@@ -1,0 +1,104 @@
+#+TITLE: jj-sidebar
+
+
+#+HTML: <p align="center">
+#+HTML: <a href="https://www.paypal.me/darkawower"><img src="https://img.shields.io/badge/PayPal-Support-00457C?style=for-the-badge&logo=paypal&logoColor=white" alt="PayPal"></a>
+#+HTML: <a href="https://ko-fi.com/artawower"><img src="https://img.shields.io/badge/Ko--fi-Support-FF5E5B?style=for-the-badge&logo=ko-fi&logoColor=white" alt="Ko-fi"></a>
+#+HTML: </p>
+
+
+A small Jujutsu sidebar for Emacs that shows changed files, lets you open them quickly, and track which files you have already reviewed.
+
+* Features
+
+- Show files changed in a Jujutsu revision.
+- Open files from a persistent side window.
+- Mark files as reviewed with =SPC=.
+- Automatically reset reviewed state when a file diff changes.
+- Highlight the last file opened from the sidebar.
+- Persist reviewed and last-opened state across Emacs restarts.
+- Show per-file change counts.
+- Supports left and right sidebars.
+
+* Requirements
+
+- Emacs 29.1+
+- [[https://github.com/jj-vcs/jj][Jujutsu]]
+- =vui= 0.1.0+
+
+* Installation
+
+** package-vc
+
+#+begin_src emacs-lisp
+(package-vc-install "https://github.com/Artawower/jj-sidebar")
+(require 'jj-sidebar)
+#+end_src
+
+** straight.el
+
+#+begin_src emacs-lisp
+(use-package jj-sidebar
+  :straight (:host github :repo "Artawower/jj-sidebar"))
+#+end_src
+
+* Usage
+
+Run:
+
+#+begin_src text
+M-x jj-sidebar
+#+end_src
+
+The default revision is =@=. Press =r= inside the sidebar to choose another revision.
+
+** Keybindings
+
+| Key     | Action                         |
+|---------+--------------------------------|
+| =RET=   | Open file                      |
+| =SPC=   | Toggle reviewed state          |
+| =j= / =n= | Open next file               |
+| =k= / =p= | Open previous file           |
+| =g=     | Refresh                        |
+| =r=     | Change revision                |
+| =s=     | Toggle change counts           |
+| =P=     | Change count position          |
+| =q=     | Close sidebar                  |
+
+Reviewed files are stored together with a hash of their current diff. If the diff changes, the file becomes unreviewed automatically.
+
+The last file opened with =RET= is highlighted in the sidebar and restored across Emacs restarts.
+
+* Configuration
+
+#+begin_src emacs-lisp
+(use-package jj-sidebar
+  :custom
+  (jj-sidebar-side 'right)
+  (jj-sidebar-width 0.32)
+  (jj-sidebar-revisions "@")
+  (jj-sidebar-show-counts t)
+  (jj-sidebar-count-position 'right))
+#+end_src
+
+Review and last-opened state are stored under =user-emacs-directory= by default. Set the corresponding variable to =nil= to keep that state only for the current Emacs session:
+
+#+begin_src emacs-lisp
+(setq jj-sidebar-review-state-file nil
+      jj-sidebar-last-opened-state-file nil)
+#+end_src
+
+* Optional window tracking
+
+By default, =jj-sidebar= remembers the editing window from which it was opened. If you want it to keep tracking the most recently selected non-sidebar window while Emacs is running:
+
+#+begin_src emacs-lisp
+(jj-sidebar-target-window-tracking-mode 1)
+#+end_src
+
+The mode is disabled by default and installs its global hook only while enabled.
+
+* License
+
+GPL-3.0-or-later.
