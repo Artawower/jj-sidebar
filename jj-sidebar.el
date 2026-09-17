@@ -148,6 +148,7 @@ Emacs session."
 (cl-defstruct jj-sidebar-entry
   status
   path
+  display-path
   change-count
   reviewed)
 
@@ -193,6 +194,10 @@ Emacs session."
 (defun jj-sidebar--revision-arg (revisions)
   (concat "--revisions=" revisions))
 
+(defun jj-sidebar--fileset-for-path (path)
+  "Return an exact workspace-relative fileset for PATH."
+  (concat "root-file:" (prin1-to-string path)))
+
 (defun jj-sidebar--parse-summary-line (line)
   (when (string-match "\\`\\([^[:space:]]+\\)[[:space:]]+\\(.+\\)\\'" line)
     (cons (match-string 1 line)
@@ -228,7 +233,7 @@ Emacs session."
                                  "--context=0"
                                  revision-arg
                                  "--"
-                                 path))
+                                 (jj-sidebar--fileset-for-path path)))
          (count 0))
     (dolist (line (split-string text "\n"))
       (when (or (jj-sidebar--added-line-p line)
@@ -244,6 +249,15 @@ Emacs session."
                    (not (string-empty-p line)))
                  (split-string summary "\n"))))
     (seq-keep #'jj-sidebar--parse-summary-line lines)))
+
+(defun jj-sidebar--real-paths (root revisions)
+  "Return real changed paths without rename/copy display formatting."
+  (let* ((revision-arg (jj-sidebar--revision-arg revisions))
+         (text (jj-sidebar--call root "diff" "--name-only" revision-arg)))
+    (seq-filter
+     (lambda (line)
+       (not (string-empty-p line)))
+     (split-string text "\n"))))
 
 (defun jj-sidebar--load-review-state ()
   (unless jj-sidebar--reviewed-state-loaded
@@ -288,7 +302,7 @@ Emacs session."
                      "--context=0"
                      (jj-sidebar--revision-arg revisions)
                      "--"
-                     path)))
+                     (jj-sidebar--fileset-for-path path))))
 
 (defun jj-sidebar--stored-review-hash (root revisions path)
   (jj-sidebar--load-review-state)
@@ -372,18 +386,23 @@ Emacs session."
 
 (defun jj-sidebar--collect-entries (root revisions)
   (let ((summary-entries (jj-sidebar--summary-entries root revisions))
+        (real-paths (jj-sidebar--real-paths root revisions))
         (stat-counts (jj-sidebar--collect-stat-counts root revisions)))
+    (unless (= (length summary-entries) (length real-paths))
+      (error "jj-sidebar: diff summary/path count mismatch"))
     (cl-loop
      for parsed in summary-entries
+     for path in real-paths
      for index from 0
      for status = (car parsed)
-     for path = (cdr parsed)
+     for display-path = (cdr parsed)
      for count = (or (nth index stat-counts)
                      (jj-sidebar--fallback-change-count-for-path root revisions path))
      collect
      (make-jj-sidebar-entry
       :status status
       :path path
+      :display-path display-path
       :change-count count
       :reviewed (jj-sidebar--reviewed-p root revisions path)))))
 
@@ -430,7 +449,8 @@ Emacs session."
                              count-width
                              (if jj-sidebar-show-counts 1 0))))
          (path (jj-sidebar--truncate-middle
-                (jj-sidebar-entry-path entry)
+                (or (jj-sidebar-entry-display-path entry)
+                    (jj-sidebar-entry-path entry))
                 path-width))
          (left (concat prefix path))
          (spaces (max 1 (- width (length left) count-width))))
@@ -447,7 +467,8 @@ Emacs session."
                    (format "%s %s " checkbox status)))
          (path-width (max 8 (- width (length prefix))))
          (path (jj-sidebar--truncate-middle
-                (jj-sidebar-entry-path entry)
+                (or (jj-sidebar-entry-display-path entry)
+                    (jj-sidebar-entry-path entry))
                 path-width)))
     (concat prefix path)))
 
